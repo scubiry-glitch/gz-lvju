@@ -1629,8 +1629,8 @@ function openProject(id, expandedAfter) {
   } else {
     state.expandedUnit = null;
   }
-  // 周边绑定（规则 17）与项目主档并行拉取；字典未就绪时兜底再拉一次 spots
-  Promise.all([api('/projects/'+id), api('/projects/'+id+'/spots')]).then(function(rs) {
+  // 周边绑定（规则 17）与项目主档并行拉取；字典未就绪时兜底再拉一次 spots；评价体系元数据并行
+  Promise.all([api('/projects/'+id), api('/projects/'+id+'/spots'), fetchSchemes()]).then(function(rs) {
     state.current = rs[0].project;
     state.units = rs[0].units || [];
     state.photos = rs[0].photos || [];
@@ -1844,21 +1844,41 @@ function numValFrom(id) {
   return v === '' ? null : +v;
 }
 
-function ratingCode(id, channel) {
-  var prefix = ({ rental:'SY-RENT', minsu:'MZ' })[channel || 'rental'] || 'SY-RENT';
+// ── 评价体系（2026-11-21 多套并存）：元数据由服务端 /api/juzhu/rating-schemes 下发，前端不另造映射 ──
+var SCHEMES = null;
+function fetchSchemes() {
+  if (SCHEMES) return Promise.resolve(SCHEMES);
+  return fetch('/api/juzhu/rating-schemes').then(function(r){ return r.json(); }).then(function(d){
+    SCHEMES = (d && d.schemes) || [];
+    return SCHEMES;
+  }).catch(function(){ SCHEMES = SCHEMES || []; return SCHEMES; });
+}
+function schemeByKey(k) { return ((SCHEMES || []).filter(function(s){ return s.key === k; })[0]) || null; }
+var CHANNEL_DEFAULT_SCHEME = { rental:'haofangzi', minsu:'caibei' };
+function effectiveScheme(p) { return schemeByKey(p.rating_scheme) || schemeByKey(CHANNEL_DEFAULT_SCHEME[p.channel]) || null; }
+function applicableSchemes(channel) { return (SCHEMES || []).filter(function(s){ return (s.channels||[]).indexOf(channel) >= 0; }); }
+function gradeOfTotal(sch, total) {
+  if (!sch || !sch.grades || total == null) return '';
+  var g = '';
+  sch.grades.forEach(function(x){ if (g === '' && total >= x.min) g = x.grade; });
+  return g;
+}
+
+function ratingCode(id, channel, schemeKey) {
+  var s = schemeByKey(schemeKey);
+  var prefix = s ? s.codePrefix : ({ rental:'SY-RENT', minsu:'MZ' })[channel || 'rental'] || 'SY-RENT';
   return prefix + '-' + String(id).padStart(5, '0');
 }
 
 var RATING_STATUS = { draft:'草稿', pending:'待复核', passed:'已通过', rejected:'已驳回' };
-var RATING_DIMS = [
-  { key:'comfort', label:'舒适' },
-  { key:'green', label:'绿色' },
-  { key:'tech', label:'科技' },
-  { key:'safety', label:'安全' }
-];
-// 评级口径按频道（与服务端 RATING_DIMS 一致）：rental=好房子4维，minsu=彩贝5维
+// 仅 rating-schemes 接口不可达时的兜底（正常情况一律以服务端元数据为准）
 var RATING_DIMS_BY_CH = {
-  rental: RATING_DIMS,
+  rental: [
+    { key:'comfort', label:'舒适' },
+    { key:'green', label:'绿色' },
+    { key:'tech', label:'智慧' },
+    { key:'safety', label:'安全' }
+  ],
   minsu: [
     { key:'scenery', label:'环境景观' },
     { key:'facilities', label:'设施配套' },
@@ -1868,17 +1888,27 @@ var RATING_DIMS_BY_CH = {
   ]
 };
 function dimsFor(channel) {
-  return RATING_DIMS_BY_CH[channel] || RATING_DIMS;
+  var sch = effectiveScheme(state.current || {});
+  if (sch && sch.type === 'dims' && sch.dims) return sch.dims;
+  return RATING_DIMS_BY_CH[channel] || RATING_DIMS_BY_CH.rental;
 }
 function ratingDimsTitle(channel) {
+  var sch = effectiveScheme(state.current || {});
+  if (sch) return sch.name + (sch.type === 'checklist' ? '' : '（' + (sch.dims||[]).length + ' 维）');
   return channel === 'minsu' ? '彩贝评级（5 维）' : '好房子评级（4 维）';
 }
 
 function parseRating(p) {
   var r = p.rating;
-  var dimsDef = dimsFor(p.channel);
-  if (!r) { r = { dims:{} }; }
+  if (!r) { r = {}; }
   if (typeof r === 'string') { try { r = JSON.parse(r); } catch(e) { r = {}; } }
+  var sch = effectiveScheme(p);
+  if (sch && sch.type === 'checklist') {
+    r.answers = r.answers || {};
+    r.specialty = r.specialty || '';
+    return r;
+  }
+  var dimsDef = dimsFor(p.channel);
   r.dims = r.dims || {};
   dimsDef.forEach(function(d){ if (r.dims[d.key] == null) r.dims[d.key] = 4; });
   r.checked = r.checked != null ? r.checked : 47;
@@ -1894,6 +1924,8 @@ function summarizeDims(dims) {
 }
 
 function collectRatingFromForm() {
+  var sch = effectiveScheme(state.current);
+  if (sch && sch.type === 'checklist') return collectGzlvjuFromForm(sch);
   var dims = {};
   dimsFor(state.current.channel).forEach(function(d){
     dims[d.key] = parseFloat(document.getElementById('r_'+d.key).value) || 0;
@@ -1905,13 +1937,72 @@ function collectRatingFromForm() {
     score: sum.score,
     checked: +document.getElementById('r_checked').value || 47,
     total: +document.getElementById('r_total').value || 55,
-    code: ratingCode(state.current.id, state.current.channel)
+    code: ratingCode(state.current.id, state.current.channel, sch && sch.key)
   };
+}
+
+// ── gzlvju 清单式打分（B.1 通用 80 + 加分 10 + 业态专项 20 三选一；总分以服务端重算为准）──
+function gzItemsOf(sch, sectionKey) { return (sch.items||[]).filter(function(it){ return it.section === sectionKey; }); }
+function gzSpecSections(sch, form) { return (sch.sections||[]).filter(function(s){ return s.form === form; }); }
+function gzItemHtml(it, answers, locked) {
+  if (it.type === 'check') {
+    return '<label style="display:flex;align-items:flex-start;gap:8px;font-size:12.5px;cursor:pointer;margin:3px 0;">'+
+      '<input type="checkbox" class="gz_ans" data-key="'+it.key+'" data-max="'+it.max+'" '+(answers[it.key]?'checked':'')+' '+(locked?'disabled':'')+' style="margin-top:2px;"/>'+
+      '<span>'+esc(it.label)+' <b style="color:var(--gold);">+'+it.max+'</b></span></label>';
+  }
+  return '<div style="margin:6px 0;"><div style="font-size:12.5px;font-weight:600;">'+esc(it.label)+' <span style="color:var(--muted);font-weight:400;">（≤'+it.max+' 分）</span></div>'+
+    '<div style="display:flex;flex-direction:column;gap:2px;margin-top:2px;">'+
+    (it.options||[]).map(function(o){
+      return '<label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;cursor:pointer;margin-left:12px;">'+
+        '<input type="radio" class="gz_ans" name="gz_'+it.key+'" data-key="'+it.key+'" data-score="'+o.score+'" value="'+o.key+'" '+(answers[it.key]===o.key?'checked':'')+' '+(locked?'disabled':'')+' style="margin-top:2px;"/>'+
+        '<span>'+esc(o.label)+' <b style="color:var(--gold);">'+o.score+'</b></span></label>';
+    }).join('')+'</div></div>';
+}
+function gzSectionHtml(sch, sec, answers, locked) {
+  var items = gzItemsOf(sch, sec.key);
+  if (!items.length) return '';
+  return '<div class="gz_sec" data-form="'+(sec.form||'')+'" style="border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-top:8px;">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--muted);">'+esc(sec.label)+' <span>（满分 '+sec.max+'）</span></div>'+
+    items.map(function(it){ return gzItemHtml(it, answers, locked); }).join('')+'</div>';
+}
+function collectGzlvjuFromForm(sch) {
+  var specialty = '';
+  var sp = document.querySelector('input[name="gz_specialty"]:checked');
+  if (sp) specialty = sp.value;
+  var answers = {}, u = 0, b = 0, s = 0;
+  document.querySelectorAll('.gz_ans').forEach(function(el){
+    var it = null;
+    (sch.items||[]).forEach(function(x){ if (x.key === el.dataset.key) it = x; });
+    if (!it) return;
+    if (it.form && it.form !== specialty) return;
+    var on = it.type === 'check' ? el.checked : !!el.checked;
+    if (it.type === 'tier') {
+      if (!el.checked) return;
+      answers[it.key] = el.value;
+      if (it.section === 'bonus') b += +el.dataset.score; else if (it.form) s += +el.dataset.score; else u += +el.dataset.score;
+    } else if (el.checked) {
+      answers[it.key] = true;
+      if (it.section === 'bonus') b += it.max; else if (it.form) s += it.max; else u += it.max;
+    }
+  });
+  return { specialty: specialty, answers: answers, score_universal: u, score_bonus: b, score_specialty: s, score_total: u+b+s };
 }
 
 function updateRatingPreview() {
   var el = document.getElementById('ratingPreview');
   if (!el) return;
+  var sch = effectiveScheme(state.current);
+  if (sch && sch.type === 'checklist') {
+    var c = collectGzlvjuFromForm(sch);
+    var grade = gradeOfTotal(sch, c.score_total);
+    var code = ratingCode(state.current.id, state.current.channel, sch.key);
+    var spName = sch.forms.specialty.options[c.specialty];
+    el.innerHTML = '预估 <b>'+c.score_total+'</b> / '+sch.totalPossible+' 分'
+      +'（通用 '+c.score_universal+' + 加分 '+c.score_bonus+' + 专项 '+c.score_specialty+'）'
+      +(spName ? ' · '+esc(spName) : ' · <span style="color:#991b1b;">未选业态专项</span>')
+      +' · <b>'+esc(grade)+'</b> · 编号 '+code;
+    return;
+  }
   var r = collectRatingFromForm();
   el.innerHTML = '预估 <b>★'+r.stars+'</b> · '+r.score+' 分 · 编号 '+r.code;
 }
@@ -1928,23 +2019,54 @@ function renderEditor() {
 
   if (!isTrade) {
     var locked = rs === 'pending' || rs === 'passed';
-    var dimsDef = dimsFor(p.channel);
-    var dimInputs = dimsDef.map(function(d){
-      return '<div><label>'+d.label+'</label><input id="r_'+d.key+'" type="number" step="0.1" min="1" max="5" value="'+(rating.dims[d.key]||4)+'" '+(locked?'disabled':'')+'/></div>';
+    var sch = effectiveScheme(p);
+    var reviewLink = 'screens/p-rating-detail.html?id='+encodeURIComponent(ratingCode(p.id, p.channel, sch && sch.key));
+    // 体系选择器：按频道过滤可选项；''=按频道默认。draft/rejected 可换，pending 锁定（服务端也拦截），passed 换=作废重审
+    var curKey = (p.rating_scheme || '');
+    var schemeSel = applicableSchemes(p.channel).map(function(s){
+      return '<option value="'+s.key+'" '+(curKey === s.key ? 'selected' : '')+'>'+esc(s.name)+'</option>';
     }).join('');
-    var reviewLink = 'screens/p-rating-detail.html?id='+encodeURIComponent(ratingCode(p.id, p.channel));
-    ratingCard =
-      '<div class="card" id="ratingCard">'+
-        '<h2>'+ratingDimsTitle(p.channel)+' <span class="rating-status '+rs+'">'+RATING_STATUS[rs]+'</span></h2>'+
-        '<p style="font-size:12px;color:var(--muted);margin:0 0 10px;">运营自评 → 提交中台复核 → 通过后前台详情页展示。复核入口：<a href="'+reviewLink+'" target="_blank">p-rating-review</a></p>'+
-        '<div class="dim-grid">'+dimInputs+'</div>'+
+    var schemeBar = '<div class="fld" style="max-width:360px;margin-bottom:10px;"><label>评价体系（录入时可选，贵州房源可切换贵州旅居体系）</label>'+
+      '<select id="r_scheme" '+(locked?'disabled':'')+'>'+
+        '<option value="" '+(curKey === '' ? 'selected' : '')+'>按频道默认（'+esc((schemeByKey(CHANNEL_DEFAULT_SCHEME[p.channel])||{}).name || '频道默认')+'）</option>'+
+        schemeSel+
+      '</select></div>';
+    var bodyHtml;
+    if (sch && sch.type === 'checklist') {
+      // 清单式（gzlvju）：业态专项三选一 + 分节 tier/check 题库
+      var specialty = rating.specialty || '';
+      var spOpts = Object.keys(sch.forms.specialty.options).map(function(k){
+        return '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;margin-right:16px;">'+
+          '<input type="radio" name="gz_specialty" value="'+k+'" '+(specialty===k?'checked':'')+' '+(locked?'disabled':'')+'/> <b>'+esc(sch.forms.specialty.options[k])+'</b></label>';
+      }).join('');
+      var universalSecs = (sch.sections||[]).filter(function(s){ return !s.form; });
+      var specSecs = specialty ? gzSpecSections(sch, specialty) : [];
+      bodyHtml = '<div style="border:1px dashed var(--line);border-radius:8px;padding:8px 12px;margin-bottom:8px;">'+
+          '<div style="font-size:12.5px;font-weight:700;">业态专项（B.2 / B.3 / B.4 三选一，满分 '+sch.forms.specialty.max+'）</div>'+spOpts+'</div>'+
+        universalSecs.map(function(s){ return gzSectionHtml(sch, s, rating.answers, locked); }).join('')+
+        '<div class="gz_spec_wrap">'+specSecs.map(function(s){ return gzSectionHtml(sch, s, rating.answers, locked); }).join('')+
+        (specialty ? '' : '<p style="font-size:11.5px;color:#991b1b;margin:8px 0 0;">请先选择业态专项，将展开对应评分表（B.2/B.3/B.4）</p>')+'</div>';
+    } else {
+      var dimsDef = dimsFor(p.channel);
+      var dimInputs = dimsDef.map(function(d){
+        return '<div><label>'+esc(d.label)+'</label><input id="r_'+d.key+'" type="number" step="0.1" min="1" max="5" value="'+(rating.dims[d.key]||4)+'" '+(locked?'disabled':'')+'/></div>';
+      }).join('');
+      bodyHtml = '<div class="dim-grid">'+dimInputs+'</div>'+
         '<div class="grid" style="margin-top:12px;">'+
           '<div class="fld"><label>自查达标项</label><input id="r_checked" type="number" value="'+rating.checked+'" '+(locked?'disabled':'')+'/></div>'+
           '<div class="fld"><label>自查总项</label><input id="r_total" type="number" value="'+rating.total+'" '+(locked?'disabled':'')+'/></div>'+
-        '</div>'+
+        '</div>';
+    }
+    var gradeBadge = (rating.grade ? ' · <span class="badge" style="background:var(--gold)">'+esc(rating.grade)+'</span>' : '');
+    ratingCard =
+      '<div class="card" id="ratingCard">'+
+        '<h2>'+ratingDimsTitle(p.channel)+' <span class="rating-status '+rs+'">'+RATING_STATUS[rs]+'</span>'+gradeBadge+'</h2>'+
+        '<p style="font-size:12px;color:var(--muted);margin:0 0 10px;">运营自评 → 提交中台复核 → 通过后前台详情页展示。复核入口：<a href="'+reviewLink+'" target="_blank">p-rating-review</a>'+((sch&&sch.standardUrl)?' · <a href="'+sch.standardUrl+'" target="_blank">评价标准 ›</a>':'')+'</p>'+
+        schemeBar+
+        bodyHtml+
         '<div class="rating-preview" id="ratingPreview"></div>'+
         '<div class="bar">'+
-          (locked ? '' : '<button class="btn primary" type="button" id="saveRating">保存自评</button>')+
+          (locked || (sch && sch.type === 'checklist') ? '' : '<button class="btn primary" type="button" id="saveRating">保存自评</button>')+
           (rs === 'draft' || rs === 'rejected' ? '<button class="btn ghost" type="button" id="submitRating">提交复核</button>' : '')+
           (rs === 'pending' ? '<a class="btn ghost" href="'+reviewLink+'" target="_blank">打开复核详情 ›</a>' : '')+
           (rs === 'passed' ? '<a class="btn ghost" href="'+reviewLink+'" target="_blank">查看复核记录 ›</a>' : '')+
@@ -2048,12 +2170,41 @@ function renderEditor() {
   }
 
   if (!isTrade) {
-    RATING_DIMS.forEach(function(d){
-      var el = document.getElementById('r_'+d.key);
-      if (el) el.oninput = updateRatingPreview;
-    });
-    var rc = document.getElementById('r_checked');
-    if (rc) rc.oninput = updateRatingPreview;
+    var sch2 = effectiveScheme(p);
+    if (sch2 && sch2.type === 'checklist') {
+      // 清单式：业态切换 → 就地展开对应专项分节；任一答案变化 → 预览重算
+      document.querySelectorAll('input[name="gz_specialty"]').forEach(function(el){
+        el.onchange = function(){
+          var wrap = document.querySelector('.gz_spec_wrap');
+          if (wrap) {
+            var secs = gzSpecSections(sch2, this.value).map(function(s){ return gzSectionHtml(sch2, s, parseRating(state.current).answers, rs === 'pending' || rs === 'passed'); }).join('');
+            wrap.innerHTML = secs || '<p style="font-size:11.5px;color:#991b1b;margin:8px 0 0;">请先选择业态专项，将展开对应评分表（B.2/B.3/B.4）</p>';
+            bindGzAnsEvents();
+          }
+          updateRatingPreview();
+        };
+      });
+      bindGzAnsEvents();
+    } else {
+      dimsFor(p.channel).forEach(function(d){
+        var el = document.getElementById('r_'+d.key);
+        if (el) el.oninput = updateRatingPreview;
+      });
+      var rc = document.getElementById('r_checked');
+      if (rc) rc.oninput = updateRatingPreview;
+    }
+    var sel = document.getElementById('r_scheme');
+    if (sel) sel.onchange = function(){
+      var v = this.value;
+      if ((p.rating_status === 'passed') && v !== (p.rating_scheme || '') && v !== (effectiveScheme(p)||{}).key) {
+        if (!confirm('切换评价体系将作废当前已通过的评级（重置为草稿），需重新提审复核。继续？')) { this.value = p.rating_scheme || ''; return; }
+      }
+      api('/projects/'+p.id, { method:'PUT', body: { rating_scheme: v || null } }).then(function(res){
+        state.current = res.project;
+        toast(v ? '评价体系已切换：'+(effectiveScheme(state.current)||{}).name : '已恢复按频道默认体系');
+        renderEditor();
+      }).catch(function(e){ toast('切换失败：'+e.message); sel.value = p.rating_scheme || ''; });
+    };
     updateRatingPreview();
     var sr = document.getElementById('saveRating');
     if (sr) sr.onclick = saveRating;
@@ -2062,7 +2213,16 @@ function renderEditor() {
   }
 }
 
+function bindGzAnsEvents() {
+  document.querySelectorAll('.gz_ans').forEach(function(el){
+    el.onchange = updateRatingPreview;
+  });
+}
+
 function saveRatingPromise() {
+  var sch = effectiveScheme(state.current);
+  // 清单式体系：自评分不落项目主档（answers 随提审一次性提交、服务端算分），无需先保存
+  if (sch && sch.type === 'checklist') return Promise.resolve(null);
   var body = collectRatingFromForm();
   return api('/projects/'+state.current.id, { method:'PUT', body: { rating: body } }).then(function(res) {
     state.current = res.project;
@@ -2072,17 +2232,32 @@ function saveRatingPromise() {
 
 function saveRating() {
   saveRatingPromise().then(function(){
-    toast('好房子自评已保存');
+    toast('自评已保存');
     renderEditor();
   }).catch(function(e){ toast('保存失败：'+e.message); });
 }
 
 function submitRating() {
+  var sch = effectiveScheme(state.current);
+  var post = { method:'POST' };
+  if (sch && sch.type === 'checklist') {
+    var c = collectGzlvjuFromForm(sch);
+    if (!c.specialty) { toast('请先选择业态专项（B.2/B.3/B.4 三选一）'); return; }
+    post.body = { rating_scheme: sch.key, specialty: c.specialty, answers: c.answers };
+    api('/projects/'+state.current.id+'/rating/submit', post).then(function(res) {
+      state.current = res.project;
+      toast('已提交中台复核 · '+ratingCode(res.project.id, res.project.channel, sch.key)+' · 总分 '+(res.project.rating ? (JSON.parse(res.project.rating).score_total) : ''));
+      renderEditor();
+    }).catch(function(e){ toast('提交失败：'+e.message); });
+    return;
+  }
   saveRatingPromise().then(function(){
-    return api('/projects/'+state.current.id+'/rating/submit', { method:'POST' });
+    var sel = document.getElementById('r_scheme');
+    var body = sel && sel.value ? { rating_scheme: sel.value } : {};
+    return api('/projects/'+state.current.id+'/rating/submit', { method:'POST', body: body });
   }).then(function(res) {
     state.current = res.project;
-    toast('已提交中台复核 · '+ratingCode(res.project.id, res.project.channel));
+    toast('已提交中台复核 · '+ratingCode(res.project.id, res.project.channel, (effectiveScheme(res.project)||{}).key));
     renderEditor();
   }).catch(function(e){ toast('提交失败：'+e.message); });
 }

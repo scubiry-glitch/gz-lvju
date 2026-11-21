@@ -17,9 +17,9 @@
     *,*::before,*::after{box-sizing:border-box}
     body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13px; line-height:1.5;}
     a{color:var(--accent); text-decoration:none;}
-    
+
     .main-wrap{padding:24px 28px 100px;}
-    
+
     /* page header */
     .page-header{
       background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
@@ -31,29 +31,29 @@
     .page-header .right{margin-left:auto; display:flex; gap:8px; align-items:center;}
     .page-header .breadcrumb{font-size:11px; color:var(--muted); margin-bottom:4px;}
     .page-header .breadcrumb a{color:var(--accent);}
-    
+
     /* layout */
     .layout{display:grid; grid-template-columns:1fr 420px; gap:18px;}
-    
+
     /* panels */
     .panel{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden;}
     .panel-head{padding:14px 18px; background:#fafafa; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px;}
     .panel-head h3{margin:0; font-size:14px; font-weight:700;}
     .panel-head .badge{font-size:10px; padding:2px 8px; border-radius:4px; background:var(--gold-soft); color:var(--gold);}
     .panel-body{padding:18px;}
-    
+
     /* house info */
     .house-hero{display:grid; grid-template-columns:120px 1fr; gap:16px; padding-bottom:16px; border-bottom:1px solid var(--border); margin-bottom:16px;}
     .house-hero .img{width:120px; height:90px; border-radius:var(--radius-md); background:linear-gradient(135deg,#e0e7ff,#c7d2fe); display:grid; place-items:center; color:#6366f1; font-size:32px;}
     .house-hero .info h4{margin:0 0 6px; font-size:18px;}
     .house-hero .info .meta{font-size:12px; color:var(--muted); display:flex; gap:12px; flex-wrap:wrap;}
     .house-hero .info .meta b{color:var(--fg);}
-    
+
     .info-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:12px;}
     .info-cell{padding:10px 12px; background:#f8fafc; border-radius:var(--radius-sm);}
     .info-cell .l{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;}
     .info-cell .v{font-size:14px; font-weight:600; margin-top:2px;}
-    
+
     /* submitted materials */
     .material-list{display:grid; gap:8px;}
     .material-item{display:flex; align-items:center; gap:10px; padding:10px 12px; background:#f8fafc; border-radius:var(--radius-sm); border:1px solid var(--border);}
@@ -64,13 +64,13 @@
     .material-item .status{font-size:11px; padding:3px 8px; border-radius:4px;}
     .material-item .status.ok{background:#dcfce7; color:#166534;}
     .material-item .status.warn{background:#fef3c7; color:#92400e;}
-    
+
     /* AI Engine Panel */
     .ai-panel{background:linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f766e 100%); color:#fff; border:none;}
     .ai-panel .panel-head{background:rgba(255,255,255,0.08); border-bottom:rgba(255,255,255,0.1);}
     .ai-panel .panel-head h3{color:#fff;}
     .ai-panel .panel-head .badge{background:rgba(255,255,255,0.15); color:#fef3c7;}
-    
+
     .ai-result{text-align:center; padding:20px; background:rgba(255,255,255,0.06); border-radius:var(--radius-md); margin-bottom:18px;}
     .ai-result .stars{font-size:32px; letter-spacing:4px; margin-bottom:8px;}
     .ai-result .stars .off{opacity:0.25;}
@@ -80,7 +80,7 @@
     .ai-result .conf{display:inline-flex; align-items:center; gap:6px; margin-top:10px; padding:4px 12px; background:rgba(255,255,255,0.1); border-radius:999px; font-size:11px;}
     .ai-result .conf .bar{width:60px; height:4px; background:rgba(255,255,255,0.2); border-radius:2px; overflow:hidden;}
     .ai-result .conf .bar i{display:block; height:100%; background:#fef3c7;}
-    
+
     /* radar chart */
     .radar-wrap{display:flex; justify-content:center; padding:16px 0;}
     .radar{position:relative; width:220px; height:220px;}
@@ -92,7 +92,7 @@
     .radar-label{position:absolute; font-size:11px; font-weight:600; white-space:nowrap; text-align:center;}
     .radar-label .val{display:block; font-size:14px; font-weight:800; color:#fef3c7;}
     .radar-label .w{font-size:9px; opacity:0.7;}
-    
+
     /* dimension breakdown */
     .dim-breakdown{margin-top:16px;}
     .dim-item{margin-bottom:12px; padding:12px; background:rgba(255,255,255,0.06); border-radius:var(--radius-sm); cursor:pointer;}
@@ -111,7 +111,7 @@
     .sub-item .val{font-weight:600;}
     .sub-item .chk{color:#fef3c7;}
     .sub-item .warn{color:#fb923c;}
-    
+
     /* human review section */
     .review-section{margin-top:18px; padding:16px; background:rgba(255,255,255,0.04); border-radius:var(--radius-md); border:1px solid rgba(255,255,255,0.1);}
     .review-section h4{margin:0 0 12px; font-size:13px; display:flex; align-items:center; gap:6px;}
@@ -121,7 +121,10 @@
     .score-adjust .adj-item{text-align:center;}
     .score-adjust .adj-item label{font-size:10px; opacity:0.7; display:block; margin-bottom:4px;}
     .score-adjust .adj-item input{width:100%; padding:6px; border:1px solid rgba(255,255,255,0.2); border-radius:4px; background:rgba(0,0,0,0.2); color:#fff; text-align:center; font-size:14px; font-weight:700;}
-    
+    .score-adjust.cols3{grid-template-columns:repeat(3,1fr);}
+    .grade-adjust{margin-top:10px; display:flex; align-items:center; gap:8px; font-size:12px;}
+    .grade-adjust select{padding:6px 10px; border-radius:4px; border:1px solid rgba(255,255,255,0.2); background:rgba(0,0,0,0.2); color:#fff; font-size:12px;}
+
     /* submit bar */
     .submit-bar{
       position:fixed; bottom:0; left:0; right:0;
@@ -136,7 +139,7 @@
     .btn-primary{background:linear-gradient(90deg,var(--accent),var(--accent-2)); color:#fff;}
     .btn-danger{background:var(--danger); color:#fff;}
     .btn-ghost{background:var(--surface); color:var(--fg); border:1px solid var(--border);}
-    
+
     @media(max-width:1100px){
       .layout{grid-template-columns:1fr;}
     }
@@ -243,7 +246,7 @@
           <span class="badge">v2.0 Demo</span>
         </div>
         <div class="panel-body" style="color:#fff;">
-          
+
           <!-- AI Result Summary -->
           <div class="ai-result">
             <div class="stars">🐚🐚🐚🐚🐚</div>
@@ -255,7 +258,7 @@
             </div>
           </div>
 
-          <!-- Radar Chart -->
+          <!-- Radar Chart（dims 体系用；清单体系会隐藏） -->
           <div class="radar-wrap">
             <div class="radar">
               <!-- Background hexagons -->
@@ -311,7 +314,7 @@
                 <div class="sub-item"><span class="nm">信息图片真实度</span><span class="val">4/4</span><span class="chk">✓</span></div>
               </div>
             </div>
-            
+
             <div class="dim-item" onclick="this.classList.toggle('open')">
               <div class="head">
                 <span class="icon">🛎</span>
@@ -327,7 +330,7 @@
                 <div class="sub-item"><span class="nm">信用分 > 4.4</span><span class="val">6/7</span><span class="chk">✓</span></div>
               </div>
             </div>
-            
+
             <div class="dim-item" onclick="this.classList.toggle('open')">
               <div class="head">
                 <span class="icon">🛏</span>
@@ -344,7 +347,7 @@
                 <div class="sub-item"><span class="nm">交付标准+甲醛检测</span><span class="val">4/5</span><span class="chk">✓</span></div>
               </div>
             </div>
-            
+
             <div class="dim-item" onclick="this.classList.toggle('open')">
               <div class="head">
                 <span class="icon">🚏</span>
@@ -359,7 +362,7 @@
                 <div class="sub-item"><span class="nm">价格合理性</span><span class="val">3/4</span><span class="warn">~</span></div>
               </div>
             </div>
-            
+
             <div class="dim-item" onclick="this.classList.toggle('open')">
               <div class="head">
                 <span class="icon">🪔</span>
@@ -423,7 +426,6 @@
     });
   </script>
   <script>
-  /* 新居住保租房 · SY-BZF-xxxxx 走 juzhu API 复核 */
   /* 图片引用 → 可用于 <img src> 的值：绝对 URL / data:/blob: 原样，本地相对路径补前导 /
      （兼容对象存储改造：库内可能存 https://file-domain/... 绝对地址） */
   function imgUrl(p) {
@@ -432,29 +434,26 @@
     if (/^(https?:)?\/\//i.test(s) || /^(data|blob):/i.test(s)) return s;
     return '/' + s.replace(/^\/+/, '');
   }
+  /* 多体系复核（2026-11-21 v2）：
+     - dims 体系（好房子 SY-RENT / 彩贝 MZ）：rating.dims + dims_meta 快照 → 雷达/维度调分（body.dims）
+     - checklist 体系（贵州旅居 GZ）：rating 快照（answers/scores/grade/specialty）→ 分节逐题答案
+       + 三桶调分（body.scores）+ 等级覆盖（body.grade）；算分以服务端为准，页面只做展示与人工调整 */
   (function(){
     var q = new URLSearchParams(location.search);
     var id = q.get('id');
-    // 评级编号前缀（规则 15）：rental=SY-RENT-、minsu=MZ-，旧 SY-BZF- 兼容；纯数字 id（存量旧链接）也放行；其余走页面静态演示内容
-    if (!id || !(/^(SY-BZF-|SY-RENT-|MZ-)/.test(id) || /^\d+$/.test(id))) return;
+    // 评级编号前缀：SY-BZF-（兼容）/SY-RENT-/MZ-/GZ-；纯数字 id（存量旧链接）也放行；其余走页面静态演示内容
+    if (!id || !(/^(SY-BZF-|SY-RENT-|MZ-|GZ-)/.test(id) || /^\d+$/.test(id))) return;
 
-    var DIMS = [
-      { key:'comfort', label:'舒适', icon:'🛋', color:'#f59e0b' },
-      { key:'green', label:'绿色', icon:'🌿', color:'#10b981' },
-      { key:'tech', label:'科技', icon:'📡', color:'#3b82f6' },
-      { key:'safety', label:'安全', icon:'🛡', color:'#ef4444' }
-    ];
-    // 评级口径按频道：rental=好房子4维，minsu=彩贝5维（与 RATING_DIMS 服务端定义一致）
-    var DIMS_BY_CH = {
-      rental: DIMS,
-      minsu: [
-        { key:'scenery', label:'环境景观', icon:'🏞', color:'#10b981' },
-        { key:'facilities', label:'设施配套', icon:'🛁', color:'#3b82f6' },
-        { key:'service', label:'服务品质', icon:'🛎', color:'#f59e0b' },
-        { key:'location', label:'区位交通', icon:'🚗', color:'#8b5cf6' },
-        { key:'culture', label:'在地体验', icon:'🧵', color:'#ef4444' }
-      ]
-    };
+    var DEFAULT_SCHEME = { rental: 'haofangzi', minsu: 'caibei' };
+    var SPECIALTY_LABEL = { apartment: '旅居公寓（B.2）', hotel: '旅居酒店（B.3）', minsu: '旅居民宿（B.4）' };
+    var SECTION_ICON = { u1: '🚉', u2: '🛏', u3: '🛎', bonus: '✨', ap1: '🛏', ap2: '🛎', ht1: '🛏', ht2: '🛎', ms1: '🛏', ms2: '🛎' };
+    var SECTION_COLOR = { u1: '#10b981', u2: '#3b82f6', u3: '#f59e0b', bonus: '#ec4899', ap1: '#8b5cf6', ap2: '#8b5cf6', ht1: '#8b5cf6', ht2: '#8b5cf6', ms1: '#8b5cf6', ms2: '#8b5cf6' };
+    var GRADE_SHELLS = { '五彩贝': 5, '四彩贝': 4, '三彩贝': 3, '二彩贝': 2, '一彩贝': 1 };
+    var SCHEMES = [];
+    var bar = null; // submit-bar 引用提升到顶层：renderChecklist/renderDims 也要用（2026-11-21 修 ReferenceError）
+
+    function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+    function schemeByKey(k){ for (var i=0;i<SCHEMES.length;i++) if (SCHEMES[i].key === k) return SCHEMES[i]; return null; }
     function authHeaders(){
       var h = {'Content-Type':'application/json'};
       try {
@@ -464,20 +463,22 @@
       return h;
     }
 
-    fetch('/api/juzhu/ratings/'+encodeURIComponent(id)).then(function(r){
-      if (!r.ok) throw new Error('not found');
-      return r.json();
-    }).then(function(data){
-      var p = data.project;
+    Promise.all([
+      fetch('/api/juzhu/ratings/' + encodeURIComponent(id)).then(function(r){ if (!r.ok) throw new Error('not found'); return r.json(); }),
+      fetch('/api/juzhu/rating-schemes').then(function(r){ return r.json(); }).catch(function(){ return { schemes: [] }; }),
+    ]).then(function(rs){
+      var p = rs[0].project;
       var rating = p.rating;
       if (typeof rating === 'string') { try { rating = JSON.parse(rating); } catch (_) { rating = {}; } }
       if (!rating || typeof rating !== 'object') rating = {};
-      var dims = rating.dims || {};
-      DIMS = DIMS_BY_CH[p.channel] || (rating.dims && Object.keys(rating.dims).length ? Object.keys(rating.dims).map(function(k){ return { key:k, label:k, icon:'•', color:'#3b82f6' }; }) : DIMS);
-      document.title = '好房子复核 · '+p.name;
-      document.querySelector('.page-header h1').textContent = '🏠 好房子复核 · '+p.name;
+      SCHEMES = (rs[1] && rs[1].schemes) || [];
+      var sch = schemeByKey(rating.scheme) || schemeByKey(p.rating_scheme) || schemeByKey(DEFAULT_SCHEME[p.channel]) || null;
+
+      document.title = (sch ? sch.name : '评级') + '复核 · ' + p.name;
+      document.querySelector('.page-header h1').textContent = (sch ? sch.name : '评级') + '复核 · ' + p.name;
+      var stdUrl = (sch && sch.standardUrl) || (p.channel === 'minsu' ? '../lvju-rating-standard.html' : '../screens/c-house-rating.html');
       document.querySelector('.page-header .sub').innerHTML =
-        id+' · '+p.name+' · '+ (p.district_name||'沈阳') +' · 参考 <a href="../screens/c-house-rating.html" style="color:var(--accent);">好房子标准</a>';
+        esc(id) + ' · ' + esc(p.name) + ' · ' + esc(p.district_name || '') + ' · 参考 <a href="' + stdUrl + '" style="color:var(--accent);">' + (sch ? esc(sch.name) + '标准' : '评价标准') + '</a>';
 
       var hero = document.querySelector('.house-hero');
       if (hero && p.cover_image) {
@@ -486,55 +487,23 @@
       if (hero) {
         hero.querySelector('h4').textContent = p.name;
         hero.querySelector('.meta').innerHTML =
-          '<span>编号: <b>'+id+'</b></span>'+
-          '<span>行政区: <b>'+(p.district_name||'—')+'</b></span>'+
-          '<span>户型: <b>'+p.unit_count+' 套</b></span>';
+          '<span>编号: <b>'+esc(id)+'</b></span>'+
+          '<span>行政区: <b>'+esc(p.district_name||'—')+'</b></span>'+
+          '<span>户型: <b>'+esc(p.unit_count)+' 套</b></span>';
       }
+      var schBadge = document.querySelector('.panel-head .badge');
+      if (schBadge) schBadge.textContent = '体系：' + (sch ? sch.name : '—');
 
-      var grid = document.querySelector('.info-grid');
-      if (grid) {
-        grid.innerHTML =
-          '<div class="info-cell"><div class="l">频道</div><div class="v">'+((window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房')+'</div></div>'+
-          '<div class="info-cell"><div class="l">起租</div><div class="v">'+(p.price_from?'¥'+p.price_from:'—')+'</div></div>'+
-          '<div class="info-cell"><div class="l">状态</div><div class="v">'+({pending:'待复核',passed:'已通过',rejected:'已驳回'}[p.rating_status]||p.rating_status)+'</div></div>'+
-          '<div class="info-cell"><div class="l">自查达标</div><div class="v">'+(rating.checked||'—')+' / '+(rating.total||55)+'</div></div>'+
-          '<div class="info-cell"><div class="l">提交时间</div><div class="v">'+((p.rating_submitted_at||'').slice(0,10)||'—')+'</div></div>'+
-          '<div class="info-cell"><div class="l">地址</div><div class="v">'+(p.address||'—')+'</div></div>';
-      }
-
-      var ai = document.querySelector('.ai-result');
-      if (ai) {
-        var stars = rating.stars || 4;
-        var starTxt = '';
-        for (var i=0;i<5;i++) starTxt += i<stars ? '★' : '<span class="off">★</span>';
-        ai.querySelector('.stars').innerHTML = starTxt;
-        ai.querySelector('.score').innerHTML = (rating.score||'—')+' <small>/ 100</small>';
-        ai.querySelector('.rec').textContent = '推荐: '+stars+'星 · '+(rating.star_label||'优质型');
-        var conf = Math.round((rating.confidence||0.9)*100);
-        ai.querySelector('.conf span').textContent = '置信度 '+conf+'%';
-        var bar = ai.querySelector('.conf .bar i');
-        if (bar) bar.style.width = conf+'%';
-      }
-
-      var dimWrap = document.querySelector('.dim-list');
-      if (dimWrap) {
-        dimWrap.innerHTML = DIMS.map(function(d){
-          var v = dims[d.key] || 4;
-          var pct = Math.round(v/5*100);
-          return '<div class="dim-item"><div class="head"><span class="icon">'+d.icon+'</span><span class="nm">'+d.label+'</span><span class="score">'+v.toFixed(1)+' / 5</span></div><div class="bar"><i style="width:'+pct+'%;background:'+d.color+';"></i></div></div>';
-        }).join('');
-      }
-
-      var adj = document.querySelector('.score-adjust');
-      if (adj) {
-        adj.innerHTML = DIMS.map(function(d){
-          return '<div class="adj-item"><label>'+d.label+'</label><input type="number" id="adj_'+d.key+'" step="0.1" min="1" max="5" value="'+(dims[d.key]||4)+'"></div>';
-        }).join('');
-      }
-
-      var bar = document.querySelector('.submit-bar');
+      var isChecklist = !!(sch && sch.type === 'checklist');
+      bar = document.querySelector('.submit-bar');
       if (!bar) return;
-      bar.querySelector('.info').innerHTML = '当前总分: <b>'+(rating.score||'—')+'</b> 分 → 推荐等级: <b style="color:var(--gold);">'+ (rating.stars||4) +' 星</b>';
+
+      if (isChecklist) {
+        renderChecklist(sch, rating, p);
+      } else {
+        renderDims(sch, rating, p);
+      }
+
       var noteEl = document.querySelector('.review-section textarea');
       if (p.rating_note && noteEl) noteEl.value = p.rating_note;
 
@@ -549,38 +518,280 @@
           method:'POST', headers: authHeaders(),
           body: JSON.stringify({ action:'reject', note: note })
         }).then(function(r){
-          return r.json().then(function(j){ return { ok: r.ok, j: j }; });
+          return r.json().then(function(j){ return { ok: r.ok, status: r.status, j: j }; });
         }).then(function(res){
           if (!res.ok || (res.j && res.j.error)) {
-            alert('驳回失败：' + ((res.j && (res.j.message || res.j.error)) || 'HTTP ' + res.status) + (res.j && /登录/.test(res.j.message || '') ? '（请刷新页面重新登录）' : ''));
+            alert('驳回失败：' + ((res.j && (res.j.message || res.j.error)) || 'HTTP ' + res.status) + (res.j && res.j.message && /登录/.test(res.j.message) ? '（请刷新页面重新登录）' : ''));
             return;
           }
           alert('已驳回'); location.href = 'p-rating-review.html';
         }).catch(function(){ alert('驳回请求失败：网络异常或服务未启动'); });
       };
       bar.querySelector('.btn-primary').onclick = function(){
-        var fd = {};
-        DIMS.forEach(function(d){
-          var el = document.getElementById('adj_'+d.key);
-          fd[d.key] = el ? parseFloat(el.value) : dims[d.key];
-        });
-        var note = noteEl ? noteEl.value.trim() : '';
+        var body;
+        if (isChecklist) {
+          var scores = {
+            score_universal: numVal('adj_score_universal', rating.score_universal || 0),
+            score_bonus: numVal('adj_score_bonus', rating.score_bonus || 0),
+            score_specialty: numVal('adj_score_specialty', rating.score_specialty || 0),
+          };
+          body = { action:'pass', scores: scores, note: noteEl ? noteEl.value.trim() : '' };
+          var gEl = document.getElementById('adj_grade');
+          if (gEl && gEl.value) body.grade = gEl.value; // 留空=按总分自动分级
+        } else {
+          var dimsMeta = currentDimsMeta, fd = {};
+          dimsMeta.forEach(function(d){
+            var el = document.getElementById('adj_' + d.key);
+            fd[d.key] = el ? parseFloat(el.value) : (rating.dims || {})[d.key];
+          });
+          body = { action:'pass', dims: fd, note: noteEl ? noteEl.value.trim() : '', checked: rating.checked, total: rating.total };
+        }
         fetch('/api/juzhu/admin/ratings/'+encodeURIComponent(id)+'/review', {
           method:'POST', headers: authHeaders(),
-          body: JSON.stringify({ action:'pass', dims: fd, note: note, checked: rating.checked, total: rating.total })
+          body: JSON.stringify(body)
         }).then(function(r){
           return r.json().then(function(j){ return { ok: r.ok, status: r.status, j: j }; });
         }).then(function(res){
           if (!res.ok || (res.j && res.j.error)) {
-            alert('复核失败：' + ((res.j && (res.j.message || res.j.error)) || 'HTTP ' + res.status) + (res.j && /登录/.test(res.j.message || '') ? '（请刷新页面重新登录）' : ''));
+            alert('复核失败：' + ((res.j && (res.j.message || res.j.error)) || 'HTTP ' + res.status) + (res.j && res.j.message && /登录/.test(res.j.message) ? '（请刷新页面重新登录）' : ''));
             return;
           }
           alert('复核通过，前台详情页将展示正式评级'); location.href = 'p-rating-review.html';
         }).catch(function(){ alert('复核请求失败：网络异常或服务未启动'); });
       };
     }).catch(function(){
-      document.querySelector('.page-header .sub').textContent = '未找到 '+id+' · 请确认 juzhu-admin 已提交且 server.py 在运行';
+      document.querySelector('.page-header .sub').textContent = '未找到 '+id+' · 请确认 juzhu-admin 已提交且 server 在运行';
     });
+
+    function numVal(elId, fallback){
+      var el = document.getElementById(elId);
+      if (!el) return fallback;
+      var v = parseFloat(el.value);
+      return isFinite(v) ? v : fallback;
+    }
+
+    /* ── dims 体系（好房子/彩贝，含存量行）：雷达 + 维度调分 ── */
+    var currentDimsMeta = [];
+    function renderDims(sch, rating, p){
+      var dims = rating.dims || {};
+      // 快照 dims_meta 优先（复核不受后续口径调整影响），其次体系注册表，最后按 dims 键兜底
+      var meta = Array.isArray(rating.dims_meta) && rating.dims_meta.length
+        ? rating.dims_meta
+        : (sch && sch.dims) || Object.keys(dims).map(function(k){ return { key:k, label:k, icon:'•' }; });
+      currentDimsMeta = meta;
+
+      var ai = document.querySelector('.ai-result');
+      if (ai) {
+        var stars = rating.stars || 4;
+        var starTxt = '';
+        for (var i=0;i<5;i++) starTxt += i<stars ? '★' : '<span class="off">★</span>';
+        ai.querySelector('.stars').innerHTML = starTxt;
+        ai.querySelector('.score').innerHTML = (rating.score != null ? rating.score : '—')+' <small>/ 100</small>';
+        ai.querySelector('.rec').textContent = '推荐: '+stars+'星 · '+(rating.star_label||'优质型');
+        var conf = Math.round((rating.confidence||0.9)*100);
+        ai.querySelector('.conf span').textContent = '置信度 '+conf+'%';
+        var cbar = ai.querySelector('.conf .bar i');
+        if (cbar) cbar.style.width = conf+'%';
+      }
+
+      var grid = document.querySelector('.info-grid');
+      if (grid) {
+        grid.innerHTML =
+          '<div class="info-cell"><div class="l">体系</div><div class="v">'+esc(sch?sch.name:'—')+'</div></div>'+
+          '<div class="info-cell"><div class="l">起租</div><div class="v">'+(p.price_from?'¥'+esc(p.price_from):'—')+'</div></div>'+
+          '<div class="info-cell"><div class="l">状态</div><div class="v">'+({pending:'待复核',passed:'已通过',rejected:'已驳回',draft:'草稿'}[p.rating_status]||p.rating_status)+'</div></div>'+
+          '<div class="info-cell"><div class="l">自查达标</div><div class="v">'+esc(rating.checked||'—')+' / '+esc(rating.total||55)+'</div></div>'+
+          '<div class="info-cell"><div class="l">提交时间</div><div class="v">'+esc((p.rating_submitted_at||'').slice(0,10)||'—')+'</div></div>'+
+          '<div class="info-cell"><div class="l">地址</div><div class="v">'+esc(p.address||'—')+'</div></div>';
+      }
+
+      // 雷达：按维度数值画五/四边形（demo 静态图直接替换）
+      var radarWrap = document.querySelector('.radar-wrap');
+      if (radarWrap) {
+        var n = meta.length;
+        if (n >= 3) {
+          var cx=100, cy=100, R=80;
+          function pt(idx, frac){
+            var ang = -Math.PI/2 + idx * 2*Math.PI/n;
+            return (cx + R*frac*Math.cos(ang)).toFixed(1) + ',' + (cy + R*frac*Math.sin(ang)).toFixed(1);
+          }
+          var bg = '', lv;
+          for (lv=1; lv<=4; lv++) {
+            var pts=[]; for (var k=0;k<n;k++) pts.push(pt(k, lv/4));
+            bg += '<polygon points="'+pts.join(' ')+'"/>';
+          }
+          var dpts=[];
+          meta.forEach(function(d, idx){
+            var v = Math.max(0, Math.min(5, +dims[d.key] || 0));
+            dpts.push(pt(idx, v/5));
+          });
+          var labels = meta.map(function(d, idx){
+            var ang = -Math.PI/2 + idx * 2*Math.PI/n;
+            var lx = cx + 108*Math.cos(ang), ly = cy + 108*Math.sin(ang);
+            var anchor = Math.abs(Math.cos(ang)) < 0.3 ? 'middle' : (Math.cos(ang) > 0 ? 'start' : 'end');
+            return '<div class="radar-label" style="left:'+lx.toFixed(0)+'px;top:'+ly.toFixed(0)+'px;transform:translate(-50%,-50%);text-align:center;"><span class="val">'+(+dims[d.key]||0).toFixed(1)+'/5</span><span class="w">'+(d.icon||'')+' '+esc(d.label)+'</span></div>';
+          }).join('');
+          radarWrap.innerHTML = '<div class="radar"><svg class="radar-bg" viewBox="0 0 200 200">'+bg+'</svg><svg class="radar-data" viewBox="0 0 200 200"><polygon points="'+dpts.join(' ')+'"/></svg><div class="radar-labels" style="inset:0;position:absolute;">'+labels+'</div></div>';
+        } else {
+          radarWrap.style.display = 'none';
+        }
+      }
+
+      var colors = ['#f59e0b','#10b981','#3b82f6','#8b5cf6','#ec4899'];
+      var wrap = document.querySelector('.dim-breakdown');
+      if (wrap) {
+        wrap.innerHTML = meta.map(function(d, i){
+          var v = +dims[d.key] || 0;
+          var pct = Math.round(v/5*100);
+          return '<div class="dim-item"><div class="head"><span class="icon">'+(d.icon||'•')+'</span><span class="nm">'+esc(d.label)+'</span><span class="score">'+v.toFixed(1)+' / 5</span></div><div class="bar"><i style="width:'+pct+'%;background:'+colors[i%colors.length]+';"></i></div></div>';
+        }).join('');
+      }
+
+      var adj = document.querySelector('.score-adjust');
+      if (adj) {
+        adj.classList.remove('cols3');
+        adj.innerHTML = meta.map(function(d){
+          return '<div class="adj-item"><label>'+esc(d.label)+'</label><input type="number" id="adj_'+esc(d.key)+'" step="0.1" min="0" max="5" value="'+(+dims[d.key]||0).toFixed(1)+'"></div>';
+        }).join('');
+        var gWrap = document.getElementById('gradeAdjustWrap');
+        if (gWrap) gWrap.innerHTML = '';
+        bindAdjustSum(meta.length, function(total, count){ return (total/count).toFixed(1) + ' 均分'; });
+      }
+
+      var b = bar ? bar.querySelector('.info') : null;
+      if (b) b.innerHTML = '当前均分: <b>'+(function(){ var vs = meta.map(function(d){ return +dims[d.key]||0; }); return vs.length ? (vs.reduce(function(a,c){return a+c;},0)/vs.length).toFixed(1) : '—'; })()+'</b> → 评级: <b style="color:var(--gold);">'+esc((sch&&sch.name)||'')+'</b>';
+    }
+
+    /* ── checklist 体系（贵州旅居）：分节得分 + 逐题答案 + 三桶调分 + 等级覆盖 ── */
+    function renderChecklist(sch, rating, p){
+      var answers = rating.answers || {};
+      var specialty = rating.specialty || '';
+      var totalPossible = sch.totalPossible || 110;
+      var grades = (typeof rating.grade != null && rating.grade) ? rating.grade : '';
+
+      // 分节小计（按 answers 重算，供展示；服务端三桶分为准）
+      var bySec = {};
+      (sch.items || []).forEach(function(it){ (bySec[it.section] = bySec[it.section] || []).push(it); });
+      function secScore(secKey){
+        return (bySec[secKey] || []).reduce(function(acc, it){
+          var v = answers[it.key];
+          if (v === true) return acc + it.max;
+          if (typeof v === 'string' && it.options) {
+            for (var i=0;i<it.options.length;i++) if (it.options[i].key === v) return acc + it.options[i].score;
+          }
+          return acc;
+        }, 0);
+      }
+      function secMax(secKey){ return ((sch.sections || []).filter(function(s){ return s.key === secKey; })[0] || {}).max || 0; }
+
+      var shells = GRADE_SHELLS[rating.grade] || 0;
+      var shellTxt = '';
+      for (var i=0;i<5;i++) shellTxt += i < shells ? '🐚' : '<span class="off">🐚</span>';
+      var ai = document.querySelector('.ai-result');
+      if (ai) {
+        ai.querySelector('.stars').innerHTML = shellTxt || '<span class="off">🐚🐚🐚🐚🐚</span>';
+        ai.querySelector('.score').innerHTML = (rating.score_total != null ? rating.score_total : '—') + ' <small>/ ' + totalPossible + '</small>';
+        ai.querySelector('.rec').innerHTML = '等级: <b>'+esc(rating.grade||'待定')+'</b>' + (specialty ? ' · ' + esc(SPECIALTY_LABEL[specialty]||specialty) : '');
+        var conf = ai.querySelector('.conf');
+        if (conf) conf.style.display = 'none';
+      }
+
+      var grid = document.querySelector('.info-grid');
+      if (grid) {
+        var su = rating.score_universal, sb = rating.score_bonus, ss = rating.score_specialty;
+        grid.innerHTML =
+          '<div class="info-cell"><div class="l">体系</div><div class="v">'+esc(sch.name)+'</div></div>'+
+          '<div class="info-cell"><div class="l">业态专项</div><div class="v">'+esc(SPECIALTY_LABEL[specialty]||'—')+'</div></div>'+
+          '<div class="info-cell"><div class="l">状态</div><div class="v">'+({pending:'待复核',passed:'已通过',rejected:'已驳回',draft:'草稿'}[p.rating_status]||p.rating_status)+'</div></div>'+
+          '<div class="info-cell"><div class="l">通用 80</div><div class="v">'+(su!=null?su:'—')+'</div></div>'+
+          '<div class="info-cell"><div class="l">加分 10 · 专项 20</div><div class="v">'+(sb!=null?sb:'—')+' · '+(ss!=null?ss:'—')+'</div></div>'+
+          '<div class="info-cell"><div class="l">提交时间</div><div class="v">'+esc((p.rating_submitted_at||'').slice(0,10)||'—')+'</div></div>';
+      }
+
+      // 雷达区隐藏（清单体系无维度雷达）
+      var radarWrap = document.querySelector('.radar-wrap');
+      if (radarWrap) radarWrap.style.display = 'none';
+
+      // 分节展开：通用（u1/u2/u3 + bonus）+ 已选业态专项
+      var wrap = document.querySelector('.dim-breakdown');
+      if (wrap) {
+        var uniSecs = ['u1','u2','u3','bonus'];
+        var specSecs = (sch.sections || []).filter(function(s){ return s.form === specialty; }).map(function(s){ return s.key; });
+        var html = '';
+        uniSecs.concat(specSecs).forEach(function(secKey, idx){
+          var its = bySec[secKey] || [];
+          if (!its.length) return;
+          var sc = secScore(secKey), mx = secMax(secKey);
+          var pct = mx ? Math.round(sc/mx*100) : 0;
+          var subs = its.map(function(it){
+            var v = answers[it.key];
+            var valHtml, mark;
+            if (it.type === 'check') {
+              var on = v === true;
+              valHtml = '<span class="val">'+it.max+'分</span>';
+              mark = on ? '<span class="chk">✓</span>' : '<span class="warn">✗</span>';
+            } else {
+              var opt = null;
+              if (typeof v === 'string' && it.options) {
+                for (var j=0;j<it.options.length;j++) if (it.options[j].key === v) opt = it.options[j];
+              }
+              valHtml = opt
+                ? '<span class="val" style="max-width:210px;display:inline-block;text-align:right;">'+esc(opt.label)+' · '+opt.score+'分</span>'
+                : '<span class="warn">未评</span>';
+              mark = opt ? '<span class="chk">✓</span>' : '<span class="warn">—</span>';
+            }
+            return '<div class="sub-item"><span class="nm">'+esc(it.label)+'</span>'+valHtml+mark+'</div>';
+          }).join('');
+          html += '<div class="dim-item'+(idx===0?' open':'')+'" onclick="this.classList.toggle(\'open\')">'+
+            '<div class="head"><span class="icon">'+(SECTION_ICON[secKey]||'•')+'</span><span class="nm">'+esc(secLabel(sch, secKey))+'</span><span class="score">'+sc+' / '+mx+'</span><span class="toggle">▼ 展开</span></div>'+
+            '<div class="bar"><i style="width:'+pct+'%;background:'+(SECTION_COLOR[secKey]||'#3b82f6')+';"></i></div>'+
+            '<div class="sub-items">'+subs+'</div></div>';
+        });
+        wrap.innerHTML = html;
+      }
+
+      // 三桶调分 + 等级覆盖
+      var adj = document.querySelector('.score-adjust');
+      if (adj) {
+        adj.classList.add('cols3');
+        adj.innerHTML =
+          '<div class="adj-item"><label>通用（80）</label><input type="number" id="adj_score_universal" min="0" max="80" value="'+(rating.score_universal||0)+'"></div>'+
+          '<div class="adj-item"><label>加分（10）</label><input type="number" id="adj_score_bonus" min="0" max="10" value="'+(rating.score_bonus||0)+'"></div>'+
+          '<div class="adj-item"><label>专项（20）</label><input type="number" id="adj_score_specialty" min="0" max="20" value="'+(rating.score_specialty||0)+'"></div>';
+        var gWrap = document.getElementById('gradeAdjustWrap');
+        if (gWrap) {
+          var gradeOpts = (sch.grades || []).map(function(g){ return '<option value="'+esc(g.grade)+'"'+(g.grade===rating.grade?' selected':'')+'>'+esc(g.grade)+'（≥'+g.min+'分）</option>'; }).join('');
+          gWrap.innerHTML = '<div class="grade-adjust"><span>等级覆盖：</span><select id="adj_grade"><option value="">按总分自动</option>'+gradeOpts+'</select></div>';
+        }
+        bindAdjustSum(3, function(total){ return total + ' 分'; });
+      }
+
+      var b = bar ? bar.querySelector('.info') : null;
+      if (b) b.innerHTML = '当前总分: <b>'+(rating.score_total!=null?rating.score_total:'—')+'</b> / '+totalPossible+' → 等级: <b style="color:var(--gold);">'+esc(rating.grade||'待定')+'</b>';
+    }
+
+    function secLabel(sch, secKey){
+      var ss = sch.sections || [];
+      for (var i=0;i<ss.length;i++) if (ss[i].key === secKey) return ss[i].label;
+      return secKey;
+    }
+
+    // 调分输入联动底栏合计（checklist=三桶合计；dims=均分展示）
+    function bindAdjustSum(count, fmt){
+      var adj = document.querySelector('.score-adjust');
+      var b = document.querySelector('.submit-bar .info b');
+      if (!adj || !b) return;
+      Array.prototype.forEach.call(adj.querySelectorAll('input'), function(inp){
+        inp.addEventListener('change', function(){
+          var total = 0, got = 0;
+          Array.prototype.forEach.call(adj.querySelectorAll('input'), function(i2){
+            var v = parseFloat(i2.value);
+            if (isFinite(v)) { total += v; got++; }
+          });
+          b.textContent = fmt(total, got || count);
+        });
+      });
+    }
   })();
   </script>
 </body>

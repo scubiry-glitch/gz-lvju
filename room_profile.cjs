@@ -16,12 +16,19 @@ const ROOM_PROFILE_ENUMS = {
   area_type: { building: '建筑面积', usable: '使用面积' },
   window_type: { exterior: '外窗', interior: '内窗', none: '无窗' },
   smoking: { no: '全屋禁烟', designated: '仅指定区域', allowed: '可吸烟' },
+  // 2026-11-21 贵州旅居评分表新增（B1-B4 打分项落字段）：卫生间档次 / 采光 / 景观视野
+  toilet: { smart: '智能马桶', regular: '马桶', squat: '蹲厕' },
+  lighting: { bright: '明亮', medium: '中等', dim: '较暗/一般' },
+  scenic_view: { window_view: '50%以上外窗有景观视野', outdoor: '有室外景观', feature: '有山地特色元素', none: '无特色景观' },
 };
 // 枚举字段自身的名字（报错与文档共用）
 const ROOM_PROFILE_ENUM_LABELS = {
   area_type: '面积口径',
   window_type: '窗户类型',
   smoking: '吸烟属性',
+  toilet: '卫生间档次',
+  lighting: '采光',
+  scenic_view: '景观与特色',
 };
 
 // 文本字段：key → { label 中文名, max 长度上限 }
@@ -52,6 +59,13 @@ const ROOM_PROFILE_NUMBERS = {
 // 布尔字段：key → label
 const ROOM_PROFILE_BOOLS = {
   window_openable: '窗户是否可开',
+  // 2026-11-21 贵州旅居评分表新增（门窗/设施/文体打分项落字段）
+  screen_window: '外窗有纱窗',
+  smart_lock: '有智能门锁',
+  balcony_terrace: '套内阳台或露台',
+  minibar: '迷你吧',
+  washer: '配备洗衣机',
+  dryer: '配备烘干机',
 };
 
 const ROOM_PROFILE_KEYS = [].concat(

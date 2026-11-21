@@ -153,6 +153,9 @@
         <option value="rental">保租房 · 好房子</option>
         <option value="minsu">旅居 · 彩贝</option>
       </select>
+      <select id="ratingScheme" style="padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;">
+        <option value="">全部体系</option>
+      </select>
       <select id="ratingStatus" style="padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;">
         <option value="pending" selected>待复核</option>
         <option value="passed">已通过</option>
@@ -169,6 +172,7 @@
             <th>项目名称</th>
             <th>行政区</th>
             <th>频道</th>
+            <th>体系</th>
             <th>AI 初评</th>
             <th>提交时间</th>
             <th>状态</th>
@@ -176,7 +180,7 @@
           </tr>
         </thead>
         <tbody id="juzhuRatings">
-          <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px;">加载中…</td></tr>
+          <tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px;">加载中…</td></tr>
         </tbody>
       </table>
     </div>
@@ -192,6 +196,9 @@
       rental: { label: '保租房 · 好房子', bg: '#ecfdf5', fg: '#065f46' },
       minsu:  { label: '旅居 · 彩贝',    bg: '#fef3c7', fg: '#92400e' }
     };
+    var SCHEMES = [], DEFAULT_SCHEME = { rental:'haofangzi', minsu:'caibei' };
+    function schemeByKey(k){ for (var i=0;i<SCHEMES.length;i++) if (SCHEMES[i].key === k) return SCHEMES[i]; return null; }
+    function schemeOfRow(p){ return schemeByKey(p.rating_scheme) || schemeByKey(DEFAULT_SCHEME[p.channel]) || null; }
     var PAGE_SIZE = 10, curPage = 1, allItems = [];
     function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
     function ratingObj(p){
@@ -206,6 +213,8 @@
     }
     function scoreOf(r){
       if (r.score != null) return { v: r.score, w: Math.max(0, Math.min(100, +r.score)) };
+      // 清单体系：按总分/110 折算百分比，数字直接展示总分
+      if (r.score_total != null) return { v: r.score_total, w: Math.max(0, Math.min(100, +r.score_total / 110 * 100)) };
       var d = r.dims, vals = (d && typeof d === 'object') ? Object.keys(d).map(function(k){ return +d[k]; }).filter(function(x){ return !isNaN(x); }) : [];
       if (!vals.length) return null;
       var avg = vals.reduce(function(a, b){ return a + b; }, 0) / vals.length;
@@ -214,10 +223,15 @@
     function filtered(){
       var st = document.getElementById('ratingStatus').value;
       var ch = document.getElementById('ratingChannel').value;
+      var sc = document.getElementById('ratingScheme').value;
       var q = (document.getElementById('ratingSearch').value || '').trim().toLowerCase();
       return allItems.filter(function(p){
         if (st && (p.rating_status || 'pending') !== st) return false;
         if (ch && (p.channel || '') !== ch) return false;
+        if (sc) {
+          var s = schemeOfRow(p);
+          if (!s || s.key !== sc) return false;
+        }
         if (q) {
           var hay = (codeOf(p) + ' ' + (p.name || '')).toLowerCase();
           if (hay.indexOf(q) < 0) return false;
@@ -230,7 +244,7 @@
       var pager = document.getElementById('juzhuPager');
       var items = filtered();
       if (!items.length) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px;">无符合筛选的房源 · 请在 <a href="../juzhu-admin.html">juzhu-admin</a> 提交评级</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px;">无符合筛选的房源 · 请在 <a href="../juzhu-admin.html">juzhu-admin</a> 提交评级</td></tr>';
         pager.innerHTML = '';
         return;
       }
@@ -249,6 +263,14 @@
         var scoreCell = sc
           ? '<div class="score-cell"><div class="score-bar"><i style="width:'+sc.w+'%;background:var(--accent);"></i></div><span class="score-num">'+sc.v+'</span></div>'
           : '—';
+        // 体系徽章：gzlvju 清单体系额外带总分/等级
+        var sch = schemeOfRow(p);
+        var schCell = sch
+          ? '<span style="font-size:11px;padding:2px 8px;border-radius:999px;background:#eff6ff;color:#1e40af;white-space:nowrap;">'+esc(sch.name)+'</span>'
+            + (sch.type === 'checklist' && r.score_total != null
+              ? '<br><small style="color:var(--muted);">'+r.score_total+'/'+(sch.totalPossible||110)+(r.grade?' · '+esc(r.grade):'')+'</small>'
+              : '')
+          : '—';
         var st = p.rating_status || 'pending';
         var dt = (p.rating_submitted_at || '').slice(0,10) || '—';
         return '<tr>'+
@@ -256,6 +278,7 @@
           '<td><b>'+esc(p.name)+'</b><br><small style="color:var(--muted);">'+esc(RGCITY)+' · '+esc(RGBIZ)+'</small></td>'+
           '<td>'+esc(p.district_name||'—')+'</td>'+
           '<td>'+chBadge+'</td>'+
+          '<td>'+schCell+'</td>'+
           '<td>'+scoreCell+'</td>'+
           '<td>'+esc(dt)+'</td>'+
           '<td><span class="status-tag '+st+'">'+(STATUS[st]||st)+'</span></td>'+
@@ -276,8 +299,16 @@
     }
     function resetPage(){ curPage = 1; render(); }
     function load(){
-      fetch('/api/juzhu/ratings').then(function(r){ return r.json(); }).then(function(data){
-        allItems = Array.isArray(data) ? data : (data.items || []);
+      Promise.all([
+        fetch('/api/juzhu/ratings').then(function(r){ return r.json(); }),
+        fetch('/api/juzhu/rating-schemes').then(function(r){ return r.json(); }).catch(function(){ return { schemes: [] }; }),
+      ]).then(function(rs){
+        allItems = Array.isArray(rs[0]) ? rs[0] : (rs[0].items || []);
+        SCHEMES = (rs[1] && rs[1].schemes) || [];
+        var sel = document.getElementById('ratingScheme');
+        sel.innerHTML = '<option value="">全部体系</option>' + SCHEMES.map(function(s){
+          return '<option value="'+s.key+'">'+esc(s.name)+'</option>';
+        }).join('');
         var counts = { pending:0, passed:0, rejected:0 };
         allItems.forEach(function(p){ var s = p.rating_status || 'pending'; if (counts[s] != null) counts[s]++; });
         document.getElementById('statTotal').textContent = allItems.length;
@@ -287,11 +318,12 @@
         resetPage();
       }).catch(function(){
         document.getElementById('juzhuRatings').innerHTML =
-          '<tr><td colspan="8" style="text-align:center;color:#991b1b;padding:24px;">无法连接新居住 API（/api/juzhu/ratings）· 请启动 juzhu 服务</td></tr>';
+          '<tr><td colspan="9" style="text-align:center;color:#991b1b;padding:24px;">无法连接新居住 API（/api/juzhu/ratings）· 请启动 juzhu 服务</td></tr>';
       });
     }
     document.getElementById('ratingStatus').onchange = resetPage;
     document.getElementById('ratingChannel').onchange = resetPage;
+    document.getElementById('ratingScheme').onchange = resetPage;
     document.getElementById('ratingSearch').oninput = resetPage;
     load();
   })();

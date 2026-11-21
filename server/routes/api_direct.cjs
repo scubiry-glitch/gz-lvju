@@ -523,7 +523,18 @@ function createApiDirectRouter(deps) {
         return jsonReply(res, catalog);
       }
 
-      // GET /api/juzhu/ratings（按 rating_status 列出评级；口径含 rental=好房子 / minsu=彩贝）
+      // GET /api/juzhu/rating-schemes —— 体系注册表元数据（公开；含 scope 与分级线的 settings KV 覆盖后生效值）
+      if (urlPath === '/api/juzhu/rating-schemes' && req.method === 'GET') {
+        const ratingCfg = require('../../rating_config.cjs');
+        const { loadRatingOverrides } = require('./rating_scheme_db.cjs');
+        const overrides = await loadRatingOverrides(queryRows);
+        const meta = ratingCfg.schemesMeta(overrides.scopes);
+        const gz = meta.find((s) => s.key === 'gzlvju');
+        if (gz && overrides.grades) gz.grades = overrides.grades;
+        return jsonReply(res, { schemes: meta });
+      }
+
+      // GET /api/juzhu/ratings（按 rating_status 列出评级；口径含 rental=好房子 / minsu=彩贝 / gzlvju=贵州旅居）
       if (urlPath === '/api/juzhu/ratings' && req.method === 'GET') {
         const qp = new URLSearchParams(qs);
         let sql = `SELECT p.*, d.name AS district_name FROM projects p
@@ -532,6 +543,15 @@ function createApiDirectRouter(deps) {
         const params = [];
         if (qp.get('status')) { sql += ' AND p.rating_status=?'; params.push(qp.get('status')); }
         if (qp.get('channel')) { sql += ' AND p.channel=?'; params.push(qp.get('channel')); }
+        if (qp.get('scheme')) {
+          // 体系筛选：显式 rating_scheme 命中，或 NULL 且 channel 默认体系等于所选
+          const ratingCfg = require('../../rating_config.cjs');
+          const sch = ratingCfg.schemeOf(qp.get('scheme'));
+          if (!sch) return jsonReply(res, { error: 'unknown scheme' }, 400);
+          sql += ' AND (p.rating_scheme=? OR (p.rating_scheme IS NULL AND p.channel IN (?, ?)))';
+          const defaults = Object.entries(ratingCfg.CHANNEL_DEFAULT_SCHEME).filter(([, v]) => v === sch.key).map(([k]) => k);
+          params.push(sch.key, defaults[0] || '__none__', defaults[1] || '__none__');
+        }
         sql += " ORDER BY COALESCE(p.rating_submitted_at,'') DESC, p.id";
         const rows = await queryRows(sql, params);
         return jsonReply(res, rows.map(stripContactPhone));

@@ -7,6 +7,7 @@ const hmacAuth = require('./hmac_auth.cjs');
 const grOrders = require('./gr_orders.cjs');
 const stayCfg = require('./stay_config.cjs');
 const ratingCfg = require('./rating_config.cjs');
+const { loadRatingOverrides: ratingOverrides, resolveForProject: resolveRatingScheme } = require('./server/routes/rating_scheme_db.cjs');
 const photoCfg = require('./photo_config.cjs');
 const roomProfileCfg = require('./room_profile.cjs');
 const MIN_PUBLISH_PHOTOS = photoCfg.PHOTO_MIN_PUBLISH;   // 单一数据源 photo_config.cjs（改阈值只改那一处）
@@ -474,9 +475,10 @@ function phoneFromBody(v) {
   return s;
 }
 
-/** 商家自有房源校验：不存在/非本商家 → 404（不泄露他人房源存在性） */
+/** 商家自有房源校验：不存在/非本商家 → 404（不泄露他人房源存在性）；附带 city_name 供评价体系 scope 校验 */
 async function ownProject(conn, vendorId, pid) {
-  const [rows] = await conn.execute('SELECT * FROM projects WHERE id=?', [parseInt(pid, 10)]);
+  const [rows] = await conn.execute(
+    'SELECT p.*, c.name AS city_name FROM projects p LEFT JOIN cities c ON c.id=p.city_id WHERE p.id=?', [parseInt(pid, 10)]);
   if (!rows.length || rows[0].owner_vendor_id !== vendorId) return null;
   return rows[0];
 }
@@ -893,36 +895,61 @@ async function housingProjectsStatus(conn, body, vendorId) {
 
 // ── 评级提审 / 审核状态（rating_status：draft → pending → passed/rejected，平台复核唯一闸）──
 
-/** 提交评级自评并进入平台复核队列：dims 按频道全维度校验（rating_config 单一数据源）；pending 中不可重复提 */
+/** 提交评级自评并进入平台复核队列（2026-11-21 多体系）：dims 体系按 scheme 校验全维度；
+ * gzlvju 清单体系走 {specialty, answers} 服务端算分；pending 中不可重复提 */
 async function housingRatingSubmit(conn, body, vendorId) {
   const b = body || {};
   if (!b.id) return reply(400, { code: 400, message: '缺少 id 参数' });
   const row = await ownProject(conn, vendorId, b.id);
   if (!row) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
-  if (!ratingCfg.RATING_DIMS[row.channel]) {
-    return reply(400, { code: 400, message: '该频道暂不支持评级（支持 rental/minsu）' });
-  }
   if (row.rating_status === 'pending') {
     return reply(400, { code: 400, message: '已在平台复核队列中，请等待审核结果（rating/status 可查）' });
   }
-  let dims;
-  try { dims = ratingCfg.normalizeDimsInput(row.channel, b.dims); }
-  catch (e) { return reply(400, { code: 400, message: e.message }); }
-  let rating = {};
-  try { rating = JSON.parse(row.rating || '{}') || {}; } catch (_) { rating = {}; }
-  rating.dims = dims;
-  rating.code = `${ratingCfg.RATING_CODE_PREFIX[row.channel] || 'SY'}-${row.id}`;
-  const now = bjStamp();
+  const overrides = await ratingOverrides((sql, params) =>
+    conn.execute(sql, params).then(([rows]) => rows));
+  const resolved = resolveRatingScheme(ratingCfg, row, b.rating_scheme, overrides);
+  if (!resolved.ok) return reply(resolved.status, { code: resolved.status, message: resolved.error });
+  const { schemeKey, scheme } = resolved;
+  const now = bjStamp(); // 时区口径随上游统一北京时间（2026-11-21 rebase 采纳）
+  let rating, extra;
+  if (scheme.type === 'checklist') {
+    let checklist;
+    try {
+      checklist = ratingCfg.normalizeChecklistInput(schemeKey, { specialty: b.specialty, answers: b.answers });
+    } catch (e) { return reply(400, { code: 400, message: e.message }); }
+    rating = {
+      scheme: schemeKey, scheme_name: scheme.name,
+      ...checklist,
+      grade: ratingCfg.computeGrade(schemeKey, checklist.score_total, overrides.grades),
+    };
+    extra = { specialty: checklist.specialty, scores: {
+      score_universal: checklist.score_universal, score_bonus: checklist.score_bonus,
+      score_specialty: checklist.score_specialty, score_total: checklist.score_total,
+    }, grade: rating.grade };
+  } else {
+    let dims;
+    try { dims = ratingCfg.normalizeDimsInput(schemeKey === 'haofangzi' ? 'rental' : 'minsu', b.dims); }
+    catch (e) { return reply(400, { code: 400, message: e.message }); }
+    let prev = {};
+    try { prev = JSON.parse(row.rating || '{}') || {}; } catch (_) { prev = {}; }
+    rating = {
+      scheme: schemeKey, scheme_name: scheme.name, dims,
+      dims_meta: ratingCfg.dimsMetaOf(schemeKey === 'haofangzi' ? 'rental' : 'minsu'),
+    };
+    if (prev.note) rating.note = prev.note;
+    extra = { dims };
+  }
+  rating.code = `${scheme.codePrefix}-${row.id}`;
   await conn.execute(
-    "UPDATE projects SET rating=?, rating_status='pending', rating_submitted_at=?, rating_note=NULL WHERE id=?",
-    [JSON.stringify(rating), now, row.id]);
+    "UPDATE projects SET rating=?, rating_status='pending', rating_submitted_at=?, rating_scheme=?, rating_note=NULL WHERE id=?",
+    [JSON.stringify(rating), now, schemeKey, row.id]);
   return reply(200, {
     code: 0, message: 'success', project_id: row.id,
-    rating_status: 'pending', rating_code: rating.code, dims,
+    rating_status: 'pending', rating_code: rating.code, rating_scheme: schemeKey, ...extra,
   });
 }
 
-/** 查审核状态：rating_status + 驳回原因（rating_note）+ 维度自评分与缺口，提审前可据此自检 */
+/** 查审核状态：rating_status + 驳回原因（rating_note）+ 自评分与缺口，提审前可据此自检；出参带体系与清单得分 */
 async function housingRatingStatus(conn, body, vendorId) {
   const b = body || {};
   if (!b.id) return reply(400, { code: 400, message: '缺少 id 参数' });
@@ -930,18 +957,39 @@ async function housingRatingStatus(conn, body, vendorId) {
   if (!row) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
   let rating = {};
   try { rating = JSON.parse(row.rating || '{}') || {}; } catch (_) { rating = {}; }
-  const reqDims = ratingCfg.RATING_DIMS[row.channel] || [];
-  const dims = (rating.dims && typeof rating.dims === 'object' && !Array.isArray(rating.dims)) ? rating.dims : null;
-  return reply(200, {
+  const schemeKey = rating.scheme || ratingCfg.resolveSchemeKey(row.rating_scheme, row.channel);
+  const scheme = ratingCfg.schemeOf(schemeKey);
+  const out = {
     code: 0, message: 'success', project_id: row.id, channel: row.channel,
+    rating_scheme: schemeKey, scheme_name: scheme ? scheme.name : null,
     rating_status: row.rating_status,
     rating_code: rating.code || null,
-    dims, missing_dims: dims ? [] : reqDims,
-    dims_meta: ratingCfg.dimsMetaOf(row.channel),
     note: row.rating_note || null,
     submitted_at: row.rating_submitted_at || null,
     reviewed_at: row.rating_reviewed_at || null,
-  });
+  };
+  if (scheme && scheme.type === 'checklist') {
+    const overrides = await ratingOverrides((sql, params) =>
+      conn.execute(sql, params).then(([rows]) => rows));
+    Object.assign(out, {
+      specialty: rating.specialty || null,
+      scores: {
+        score_universal: rating.score_universal ?? null, score_bonus: rating.score_bonus ?? null,
+        score_specialty: rating.score_specialty ?? null, score_total: rating.score_total ?? null,
+      },
+      grade: rating.grade || ratingCfg.computeGrade(schemeKey, rating.score_total || 0, overrides.grades),
+      total_possible: scheme.totalPossible,
+      grades: overrides.grades || scheme.grades,
+    });
+  } else {
+    const reqDims = (scheme ? scheme.dims : ratingCfg.RATING_DIMS[row.channel]) || [];
+    const dims = (rating.dims && typeof rating.dims === 'object' && !Array.isArray(rating.dims)) ? rating.dims : null;
+    Object.assign(out, {
+      dims, missing_dims: dims ? [] : reqDims,
+      dims_meta: ratingCfg.dimsMetaOf(schemeKey === 'haofangzi' ? 'rental' : 'minsu'),
+    });
+  }
+  return reply(200, out);
 }
 
 async function housingUnitsCreate(conn, body, vendorId) {

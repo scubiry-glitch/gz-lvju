@@ -431,6 +431,7 @@ function createSchema(deps) {
           old_house_hint TEXT,
           rating_status VARCHAR(20) NOT NULL DEFAULT 'draft',
           rating TEXT,
+          rating_scheme VARCHAR(30) NULL,
           rating_submitted_at VARCHAR(30),
           rating_reviewed_at VARCHAR(30),
           rating_note TEXT,
@@ -1014,6 +1015,8 @@ function createSchema(deps) {
       // 迁移：补充可能缺失的列（ALTER TABLE ... ADD COLUMN IF NOT EXISTS 在 MySQL 8.0 不支持，用 try/catch 忽略重复列错误）
       const migrations = [
         "ALTER TABLE projects ADD COLUMN contact_phone VARCHAR(50)",
+        // 房源级评价体系（2026-11-21 多套并存改造）：NULL=按 channel 默认（rental→haofangzi、minsu→caibei）
+        "ALTER TABLE projects ADD COLUMN rating_scheme VARCHAR(30) NULL",
         "ALTER TABLE booking_orders ADD UNIQUE KEY uk_bo_idempotency (idempotency_key)",
         // 旧版种子在 status=online 时尚未落 rating_status；仅回填历史在线数据，新建房源仍默认为 draft。
         "UPDATE projects SET rating_status='passed' WHERE status='online' AND (rating_status IS NULL OR rating_status='draft')",

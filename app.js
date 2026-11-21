@@ -819,6 +819,7 @@ function isCEndPublicApi(urlPath, method) {
     '/api/juzhu/settings',
     '/api/juzhu/stats',
     '/api/juzhu/ratings',
+    '/api/juzhu/rating-schemes',
     '/api/juzhu/trade',
     '/api/juzhu/jiazheng/categories',
     '/api/juzhu/jiazheng/skus',

@@ -1,6 +1,7 @@
 'use strict';
 const { bjStamp } = require('../utils/bj-time.cjs');
 const vendorPayment = require('../payment/vendor-payment.cjs');
+const { loadRatingOverrides: ratingOverrides, resolveForProject: resolveRatingScheme } = require('./rating_scheme_db.cjs');
 /**
  * /api/juzhu/admin/* 管理域（从 app.js 拆出）。
  * 权限闸仍在 app.js（perm_registry）；此处只做业务处理。
@@ -1487,6 +1488,14 @@ queryRows,
         const slug = await uniqueProjectSlug(conn, channel, name, body.slug);
         const [cityRows] = await conn.execute('SELECT name FROM cities WHERE id=?', [cityId]);
         const cityName = cityRows.length ? cityRows[0].name : '';
+        // 录入时可选评价体系（2026-11-21）：缺省=channel 默认；范围校验放在 INSERT 前，避免非法值留下孤儿项目
+        let ratingSchemeKey = null;
+        if (body.rating_scheme) {
+          const overrides = await ratingOverrides(queryRows);
+          const resolved = resolveRatingScheme(ratingCfg, { channel, city_name: cityName }, body.rating_scheme, overrides);
+          if (!resolved.ok) { conn.end(); return jsonReply(res, { error: resolved.error }, resolved.status); }
+          ratingSchemeKey = resolved.schemeKey;
+        }
         let address = body.address;
         if (!address) {
           if (districtId) {
@@ -1534,6 +1543,9 @@ queryRows,
           );
         }
         if (districtId) await syncDistrictStats(conn, districtId);
+        if (ratingSchemeKey) {
+          await conn.execute('UPDATE projects SET rating_scheme=? WHERE id=?', [ratingSchemeKey, pid]);
+        }
         await conn.commit();
         const [projs] = await conn.execute(
           'SELECT p.*, d.name AS district_name FROM projects p LEFT JOIN districts d ON d.id=p.district_id WHERE p.id=?',
@@ -1561,7 +1573,8 @@ queryRows,
         const body = await readBody(req);
         const conn = await mysql2.createConnection(getDbConfig());
         try {
-          const [existing] = await conn.execute('SELECT id, channel, ext FROM projects WHERE id=?', [pid]);
+          const [existing] = await conn.execute(
+            'SELECT p.id, p.channel, p.ext, p.rating_scheme, p.rating_status, c.name AS city_name FROM projects p LEFT JOIN cities c ON c.id=p.city_id WHERE p.id=?', [pid]);
           if (!existing.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const sets = [], vals = [];
           const put = (col, val) => { sets.push(`${col}=?`); vals.push(val); };
@@ -1620,6 +1633,22 @@ queryRows,
             const [statRow] = await conn.execute('SELECT rating_status FROM projects WHERE id=?', [pid]);
             if (statRow.length && ['draft', 'rejected', null].includes(statRow[0].rating_status)) {
               put('rating', body.rating ? JSON.stringify(body.rating) : null);
+            }
+          }
+          // 评价体系切换（2026-11-21 多套并存）：draft/rejected 可随意换；pending 锁定不可换；
+          // passed 换体系=作废重审（rating_status 重置 draft，评级编号随新体系前缀重新生成）
+          if ('rating_scheme' in body) {
+            const cur = existing[0];
+            if (cur.rating_status === 'pending') {
+              conn.end();
+              return jsonReply(res, { error: '复核进行中（pending）不可更换评价体系，请等复核完成' }, 400);
+            }
+            const overrides = await ratingOverrides(queryRows);
+            const resolved = resolveRatingScheme(ratingCfg, cur, body.rating_scheme, overrides);
+            if (!resolved.ok) { conn.end(); return jsonReply(res, { error: resolved.error }, resolved.status); }
+            put('rating_scheme', body.rating_scheme || null);
+            if (cur.rating_status === 'passed' && resolved.schemeKey !== cur.rating_scheme) {
+              put('rating_status', 'draft');
             }
           }
           if (sets.length) {
@@ -2316,44 +2345,72 @@ queryRows,
       return jsonReply(res, out);
     }
 
-    // POST /admin/projects/:id/rating/submit
+    // POST /admin/projects/:id/rating/submit —— 支持多体系（2026-11-21）：
+    // body.rating_scheme 可选（缺省=房源 rating_scheme 列 > channel 默认）；gzlvju 清单体系走
+    // body {specialty, answers} 服务端算分快照，dims 体系沿用已保存自评分。范围校验按 scope。
     {
       const m = urlPath.match(/^\/api\/juzhu\/admin\/projects\/(\d+)\/rating\/submit$/);
       if (m && req.method === 'POST') {
         const pid = parseInt(m[1]);
+        const body = await readBody(req);
         const conn = await mysql2.createConnection(getDbConfig());
         try {
-          const [rows] = await conn.execute('SELECT * FROM projects WHERE id=?', [pid]);
+          const [rows] = await conn.execute(
+            'SELECT p.*, c.name AS city_name FROM projects p LEFT JOIN cities c ON c.id=p.city_id WHERE p.id=?', [pid]);
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const proj = rows[0];
           // 权限：房主 vendor 或 platform（admin 会话/API Key）
           const sess = await requestSession(req);
           const owns = sess && sess.role === 'vendor' && proj.owner_vendor_id === sess.vendorId;
           if (!owns && !(await requireApiKey(req, res))) return;
-          const dimsReq = RATING_DIMS[proj.channel];
-          if (!dimsReq) { conn.end(); return jsonReply(res, { error: '该频道暂不支持评级（支持 rental/minsu）' }, 400); }
           if (proj.rating_status === 'pending') { conn.end(); return jsonReply(res, { error: '已在复核队列中' }, 400); }
+          const overrides = await ratingOverrides(queryRows);
+          const resolved = resolveRatingScheme(ratingCfg, proj, body && body.rating_scheme, overrides);
+          if (!resolved.ok) { conn.end(); return jsonReply(res, { error: resolved.error }, resolved.status); }
+          const { schemeKey, scheme } = resolved;
+          const now = bjStamp(); // 时区口径随上游统一北京时间（2026-11-21 rebase 采纳）
           let rating = {};
-          if (proj.rating) {
-            try { rating = JSON.parse(proj.rating); } catch (_) { rating = {}; }
+          if (scheme.type === 'checklist') {
+            // 清单体系：answers 直接随提审提交，服务端重算总分（不信任客户端合计）
+            let checklist;
+            try {
+              checklist = ratingCfg.normalizeChecklistInput(schemeKey, {
+                specialty: body && body.specialty, answers: body && body.answers,
+              });
+            } catch (e) { conn.end(); return jsonReply(res, { error: e.message }, 400); }
+            rating = {
+              scheme: schemeKey, scheme_name: scheme.name,
+              ...checklist,
+              grade: ratingCfg.computeGrade(schemeKey, checklist.score_total, overrides.grades),
+            };
+          } else {
+            // dims 体系：沿用已保存的自评分；快照维度元数据，复核/展示不受后续口径调整影响
+            const dimsReq = scheme.dims;
+            let prev = {};
+            if (proj.rating) { try { prev = JSON.parse(proj.rating); } catch (_) { prev = {}; } }
+            const dims = prev.dims || {};
+            if (!dimsReq.every(k => dims[k] != null)) {
+              conn.end();
+              return jsonReply(res, { error: `请先保存 ${dimsReq.length} 维自评分（${scheme.name} 口径）` }, 400);
+            }
+            rating = {
+              scheme: schemeKey, scheme_name: scheme.name,
+              dims,
+              dims_meta: ratingCfg.dimsMetaOf(schemeKey === 'haofangzi' ? 'rental' : 'minsu'),
+            };
+            if (prev.note) rating.note = prev.note;
           }
-          const dims = rating.dims || {};
-          if (!dimsReq.every(k => dims[k] != null)) {
-            conn.end();
-            return jsonReply(res, { error: `请先保存 ${dimsReq.length} 维自评分（${proj.channel} 口径）` }, 400);
-          }
-          const now = bjStamp();
-          rating.code = `${RATING_CODE_PREFIX[proj.channel] || 'SY'}-${pid}`;
+          rating.code = `${scheme.codePrefix}-${pid}`;
           await conn.execute(
-            "UPDATE projects SET rating=?, rating_status='pending', rating_submitted_at=?, rating_note=NULL WHERE id=?",
-            [JSON.stringify(rating), now, pid]
+            "UPDATE projects SET rating=?, rating_status='pending', rating_submitted_at=?, rating_scheme=?, rating_note=NULL WHERE id=?",
+            [JSON.stringify(rating), now, schemeKey, pid]
           );
           await conn.commit();
           const [updated] = await conn.execute(
             'SELECT p.*, d.name AS district_name FROM projects p LEFT JOIN districts d ON d.id=p.district_id WHERE p.id=?',
             [pid]
           );
-          return jsonReply(res, { ok: true, project: updated[0] });
+          return jsonReply(res, { ok: true, project: updated[0], rating_scheme: schemeKey });
         } finally {
           await conn.end();
         }
@@ -2614,6 +2671,19 @@ queryRows,
           try { rating = JSON.parse(rows[0].rating || '{}'); } catch (_) {}
           if (body.dims) rating.dims = body.dims;
           if (body.total != null) rating.total = body.total;
+          // 清单体系（gzlvju 等）：复核可微调分节得分；grade 缺省时按总分+分级线（settings KV 可覆盖）重算
+          if (body.scores && typeof body.scores === 'object') {
+            rating.score_universal = Number(body.scores.score_universal) || 0;
+            rating.score_bonus = Number(body.scores.score_bonus) || 0;
+            rating.score_specialty = Number(body.scores.score_specialty) || 0;
+            rating.score_total = rating.score_universal + rating.score_bonus + rating.score_specialty;
+          }
+          if (body.grade) {
+            rating.grade = String(body.grade);
+          } else if (rating.score_total != null) {
+            const overrides = await ratingOverrides(queryRows);
+            rating.grade = ratingCfg.computeGrade(rating.scheme || 'gzlvju', rating.score_total, overrides.grades);
+          }
           await conn.execute(
             'UPDATE projects SET rating=?, rating_status=?, rating_reviewed_at=?, rating_note=? WHERE id=?',
             [JSON.stringify(rating), action, now, body.note || null, pid]
@@ -2660,6 +2730,7 @@ queryRows,
               project_id: pid,
               code: ratingCode,
               channel: proj.channel,
+              rating_scheme: rating.scheme || proj.rating_scheme || null,
               rating_status: action,
               rating_note: body.note || null,
               reviewed_at: now,

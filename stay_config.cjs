@@ -11,6 +11,27 @@ const INSURANCE_TYPES = [
 ];
 const INSURANCE_KEYS = INSURANCE_TYPES.map((t) => t.key);
 
+// 项目级旅居评分扩展字段（2026-11-21 贵州旅居评分表 B1-B4 落字段，projects.ext 单一数据源）：
+// 多选枚举存 key 数组；布尔存 true；资质文件位存图片 URL（挂 photos.other 后把地址填这里）
+const LVJU_PROJECT_EXT = {
+  // 多选枚举：key → 中文名
+  public_facilities: { label: '文体活动场所', values: { gym: '健身房', pool: '游泳池', cafe: '咖啡厅' } },
+  shuttle: { label: '接驳与摆渡', values: { station_pickup: '高铁站/机场免费接驳', scenic_bus: '景区摆渡车' } },
+  activities: { label: '特色活动', values: { harvest_fishing: '采摘/垂钓/加工餐饮', hiking: '自然徒步', craft: '手工体验' } },
+  // 布尔
+  coworking_space: { label: '提供共享办公空间', type: 'bool' },
+  wheelchair_accessible: { label: '无障碍设施完善（轮椅可通行）', type: 'bool' },
+  alarm_device: { label: '套内配备一键报警装置', type: 'bool' },
+  guide_service: { label: '提供导游服务', type: 'bool' },
+  // 结构化对象
+  service_sla: { label: '客服响应时效', type: 'object', fields: { response_minutes: '响应时限（分钟，15/30/120）' } },
+  butler_config: { label: '管家/前台配置', type: 'object', fields: { level: '形式（full专职/onsite线下/online线上）', h24: '是否24h（true/false）' } },
+  // 资质文件位（图片 URL）
+  cert_staff_training: { label: '服务人员培训/认证证书（图片URL）', type: 'url' },
+  license_food: { label: '食品经营许可证+健康证（图片URL）', type: 'url' },
+};
+const LVJU_PROJECT_EXT_KEYS = Object.keys(LVJU_PROJECT_EXT);
+
 // 最短连住晚数（详情日历与下单共同校验）：rental / minsu 频道兜底都是 15 晚。
 // 房源、户型可以写更短的数，但下单只在「比下一级更长」时才采用，不能把兜底放宽。
 const STAY_MIN_NIGHTS_DEFAULT = { rental: 15, minsu: 15 };
@@ -666,6 +687,8 @@ async function releaseStayQty(execute, opts) {
 module.exports = {
   INSURANCE_TYPES,
   INSURANCE_KEYS,
+  LVJU_PROJECT_EXT,
+  LVJU_PROJECT_EXT_KEYS,
   STAY_MIN_NIGHTS_DEFAULT,
   STAY_MIN_NIGHTS_MIN,
   STAY_BOOKABLE_KEY,
